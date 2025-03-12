@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pubfinder Settings</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="googlemaps.js"></script>
+</head>
+<body onload="init()">
+    <!-- Always shows a header, even in smaller screens. -->
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+        <div class="mdl-layout__header-row">
+            <!-- Title -->
+            <span class="mdl-layout-title">Pub Finder Settings</span>
+            <!-- Add spacer, to align navigation to the right -->
+            <div class="mdl-layout-spacer"></div>
+            <!-- Navigation. We hide it in small screens. -->
+            <nav class="mdl-navigation mdl-layout--large-screen-only">
+            <a class="mdl-navigation__link" href="index.html">Home</a>
+            <a class="mdl-navigation__link" href="pub_maps.html">Map</a>
+            <a class="mdl-navigation__link" href="pub_import.html">Import</a>
+            <a class="mdl-navigation__link" href="pub_settings.html">Settings</a>
+            <a class="mdl-navigation__link" href="pub_help.html">Help</a>
+            </nav>
+        </div>
+        </header>
+        <div class="mdl-layout__drawer">
+        <span class="mdl-layout-title">Pub Finder</span>
+        <nav class="mdl-navigation">
+            <a class="mdl-navigation__link" href="index.html">Home</a>
+            <a class="mdl-navigation__link" href="pub_maps.html">Map</a>
+            <a class="mdl-navigation__link" href="pub_import.html">Import</a>
+            <a class="mdl-navigation__link" href="pub_settings.html">Settings</a>
+            <a class="mdl-navigation__link" href="pub_help.html">Help</a>
+        </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <div class="page-content" id="page_settings"><!-- Your content goes here -->
+                <fieldset>
+                    <legend>Standortbestimmung</legend>
+                    <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" >
+                        <input class="mdl-radio__button" id="pos1" name="position" type="radio" value="regionpos" onchange="getValue(this)">
+                        <span class="mdl-radio__label">Pub Region</span>
+                    </label>
+                    <br>
+                    <label class="mdl-radio mdl-js-radio mdl-js-ripple-effect" >
+                        <input class="mdl-radio__button" id="pos2" name="position" type="radio" value="currentpos" onchange="getValue(this)">
+                        <span class="mdl-radio__label">Aktueller Standort</span>
+                    </label>
+                </fieldset>
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                    <select class="mdl-textfield__input" id="region_selector" name="regionlist" onchange="regionchanged(this)" >
+                    </select>
+                </div>
+                <p id="txt_currentpos"> Aktuelle Position</p>
+                <div>
+                     
+                    <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" id="savechanges">
+                        Speichern
+                    </button>
+                </div> 
+            </div>
+        </main>     
+</body>
+
+<script>
+// different events are used in chrome desktop browser and on apple mobile devices
+// Chrome:          onclick
+// Apple mobile:    ontouchstart
+if (navigator.userAgent.indexOf("Chrome") > -1) {
+    console.log("Chrome");
+    document.getElementById('savechanges').onclick = savelocationSettings;
+}else {
+    // Safari on iphone and ipad uses ontouchstart
+    console.log("No Chrome");
+    document.getElementById('savechanges').ontouchstart = savelocationSettings;
+}    
+
+let locationpubs=[];
+let retlocation = null;
+let curposloc=[];
+
+
+function init() {;
+    document.getElementById('region_selector').style.display = 'none';
+    document.getElementById('txt_currentpos').style.display = 'none';
+    
+    let retString = null;
+    let rbtnpos;
+        
+    // Retrieve the JSON string from local storage
+    retString = localStorage.getItem("defaultlocation");
+
+    if (retString != null){
+        retlocation = JSON.parse(retString);
+        switch(retlocation.type) {
+            case 'regionpos':
+                rbtnpos='pos1';
+            break;
+            case 'currentpos':
+                rbtnpos='pos2';
+            break;
+            default:
+            // code block
+        }
+        const defaultradio = document.getElementById(rbtnpos);
+        defaultradio.checked = true;
+        getValue(defaultradio);   
+    }
+
+    retString = null;
+    
+    // get pubs from csv
+    // Retrieve the JSON string from local storage
+    retString = localStorage.getItem("restaurants");
+    
+    if (retString != null) {
+        // Convert the JSON string back to an array
+        let retArray = JSON.parse(retString);
+        locationpubs=[];
+    
+        for(let i = 0; i < retArray.length; i++){
+            let objcsvpub = {
+                        "name":      retArray[i].name,
+                        "address":   JSON.parse(retArray[i].address),
+                }
+            locationpubs.push(objcsvpub);
+        }
+
+        // get pub locations
+        console.log("getLocations");
+        getpubLocations();
+        
+    }
+    
+    disablesaveButton(document.getElementById('savechanges'));
+    
+}
+
+
+function savelocationSettings() {
+
+    const radioButtons = document.querySelectorAll('input[name="position"]');
+    let selectedPosition;
+    let string;
+    for (const radioButton of radioButtons) {
+        if (radioButton.checked) {
+            selectedPosition = radioButton.value;
+            break;
+        }
+    }
+    switch(selectedPosition) {
+            case 'regionpos':
+                let element_selector = document.getElementById('region_selector');
+                console.log('selected location: ' + element_selector.value + " " + element_selector[element_selector.selectedIndex].text );
+                let obj_pubaddr = {
+                    "type":     selectedPosition,
+                    "zipcode":  element_selector.value,
+                    "location": element_selector[element_selector.selectedIndex].text
+                }
+
+                // Convert the array to a JSON string
+                string = JSON.stringify(obj_pubaddr);
+
+                // Store the JSON string in local storage
+                localStorage.setItem("defaultlocation", string);
+
+            break;
+            case 'currentpos':
+            console.log('selected positon: ' + 'Test' ); 
+            let obj_curpos = {
+                    "type":     selectedPosition,
+                    "zipcode":  curposloc[0],
+                    "location": curposloc[1]
+                }
+
+                // Convert the array to a JSON string
+                string = JSON.stringify(obj_curpos);
+
+                // Store the JSON string in local storage
+                localStorage.setItem("defaultlocation", string);
+            
+            break;
+                
+            default:
+            // code block
+    }
+    disablesaveButton(document.getElementById('savechanges'));
+}
+
+function getValue(radio) {
+    console.log('radio selected: ' + radio.value);
+
+    let element_selector = document.getElementById('region_selector');
+    let element_curpos   = document.getElementById('txt_currentpos');
+
+    switch(radio.value) {
+        case 'regionpos':
+            //selector.style.visibility = 'visible';
+            element_selector.style.display = 'block';
+            element_curpos.style.display = 'none';
+        break;
+        case 'currentpos':
+            element_selector.style.display = 'none';
+            element_curpos.style.display = 'block';
+            getCurrentPosition();
+            enablesaveButton(document.getElementById('savechanges'));
+        break;
+        default:
+        // code block
+    }
+
+}
+
+function regionchanged(sel_region) {
+    console.log('region changed : ' + sel_region.value + " " + sel_region[sel_region.selectedIndex].text);
+    disablesaveButton(document.getElementById('savechanges'));
+    for (let i = 0; i < sel_region.options.length; i++) {
+    //    console.log('region changed1 : ' +  i + " " + sel_region.options[i].selected + " " + sel_region.options[i].defaultSelected );
+        if(sel_region.options[i].selected != sel_region.options[i].defaultSelected) {
+            if (sel_region.options[i].selected == true){
+                console.log('region changed2 : ' + sel_region.options[i].text );
+                enablesaveButton(document.getElementById('savechanges'));
+            }
+        }
+    }
+}
+
+function enablesaveButton(button) {
+    button.removeAttribute("disabled");
+    button.style.backgroundColor = '#75FA8D';
+    button.style.color = '#00023D';    
+}
+
+function disablesaveButton(button) {
+    button.style.backgroundColor = '#808080';
+    button.setAttribute("disabled","disabled");
+}
+
+
+
+function getpubLocations(){
+    const arr_publocations = new Array();
+    let sb_region=document.getElementById("region_selector");
+    let default_location_Index = 0;
+    
+    for (let i = 0; i < locationpubs.length; i++) {
+        
+        let obj_publoc = {
+            "zipcode":  locationpubs[i].address.zipcode,
+            "city":  locationpubs[i].address.location,
+        }
+
+        let findvalue=undefined;
+        
+        findvalue=arr_publocations.find(findvalue => findvalue.zipcode === locationpubs[i].address.zipcode);
+
+        if (findvalue == undefined) {
+            arr_publocations.push(obj_publoc);
+        }
+    }
+    console.log("length: " + arr_publocations.length);
+    arr_publocations.sort((a, b) => a.city.localeCompare(b.city));
+
+    for (let j = 0; j < arr_publocations.length; j++) {
+        console.log("location: " + arr_publocations[j].zipcode + " " + arr_publocations[j].city);
+        let opt = document.createElement("option"); 
+        opt.text = arr_publocations[j].city;
+        opt.value = arr_publocations[j].zipcode;
+        sb_region.options.add(opt);
+        if (retlocation != null) {
+            if (retlocation.zipcode == arr_publocations[j].zipcode){
+                default_location_Index=j;
+            } 
+        }
+    }
+    // set the default region
+    sb_region.options[default_location_Index].defaultSelected=true;
+}
+
+async function getCurrentPosition(){
+    let element_curpos = document.getElementById('txt_currentpos');
+    const { Map } = await google.maps.importLibrary("maps");
+    const geocoder = new google.maps.Geocoder();
+    let latitude = null;
+    let longitude = null;
+    curposloc=[];
+    let address="";
+    const curpospattern=/\d{5}\s.+,/;
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+        function(position) {
+            latitude = position.coords.latitude;
+            longitude = position.coords.longitude;
+            console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+            
+            const latlng = {
+                lat: parseFloat(latitude),
+                lng: parseFloat(longitude),
+            };
+            geocoder
+                .geocode({ location: latlng })
+                .then((response) => {
+                    let index = 2;
+                if (response.results[index]) {
+                    console.log('address: ' + response.results[index].formatted_address);
+                    //element_curpos.textContent='Latitude: ' + latitude + ' Longitude: ' + longitude + '<br>' + 'address: ' +  response.results[index].formatted_address;
+                    element_curpos.innerHTML = 'Latitude: ' + latitude + ' Longitude: ' + longitude + '<br>';
+                    address= response.results[index].formatted_address
+                    element_curpos.innerHTML += 'address: ' +  address + '<br>';
+                    let curloc = address.match(curpospattern);
+                    let strcurloc = curloc[0].slice(0,-1);
+                    console.log('curloc: ' + strcurloc);
+                    element_curpos.innerHTML += 'location: ' +  strcurloc;
+
+                    curposloc[0]= strcurloc.split(" ")[0];
+                    curposloc[1]= strcurloc.split(" ")[1];
+                } else {
+                window.alert("No results found");
+                }
+            })
+            .catch((e) => window.alert("Geocoder failed due to: " + e));
+
+            },
+            function(error) {
+                console.error(`Error Code = ${error.code} - ${error.message}`);
+            }
+        );
+    } else {
+    console.log("Geolocation is not supported by this browser.");
+    }
+}
+
+</script>
+</html>

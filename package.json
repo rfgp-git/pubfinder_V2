@@ -1,0 +1,16 @@
+{
+  "name": "pubfinder_v2",
+  "version": "1.0.0",
+  "description": "pubfinder with backend server",
+  "main": "pubserver.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server"
+  },
+  "author": "Peter Tyrach",
+  "license": "ISC",
+  "dependencies": {
+    "csvtojson": "^2.0.10",
+    "express": "^4.21.2"
+  }
+}

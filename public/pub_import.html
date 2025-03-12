@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pubfinder Import</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="pubs_list.js"></script>
+</head>
+<body onload ="init()">
+    <!-- Always shows a header, even in smaller screens. -->
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+        <div class="mdl-layout__header-row">
+            <!-- Title -->
+            <span class="mdl-layout-title">Pub Finder Import</span>
+            <!-- Add spacer, to align navigation to the right -->
+            <div class="mdl-layout-spacer"></div>
+            <!-- Navigation. We hide it in small screens. -->
+            <nav class="mdl-navigation mdl-layout--large-screen-only">
+            <a class="mdl-navigation__link" href="index.html">Home</a>
+            <a class="mdl-navigation__link" href="pub_maps.html">Map</a>
+            <a class="mdl-navigation__link" href="pub_import.html">Import</a>
+            <a class="mdl-navigation__link" href="pub_settings.html">Settings</a>
+            <a class="mdl-navigation__link" href="pub_help.html">Help</a>
+            </nav>
+        </div>
+        </header>
+        <div class="mdl-layout__drawer">
+        <span class="mdl-layout-title">Pub Finder</span>
+        <nav class="mdl-navigation">
+            <a class="mdl-navigation__link" href="index.html">Home</a>
+            <a class="mdl-navigation__link" href="pub_maps.html">Map</a>
+            <a class="mdl-navigation__link" href="pub_import.html">Import</a>
+            <a class="mdl-navigation__link" href="pub_settings.html">Settings</a>
+            <a class="mdl-navigation__link" href="pub_help.html">Help</a>
+        </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <div class="page-content" id="page_import"><!-- Your content goes here -->
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--file">
+                    <input class="mdl-textfield__input" placeholder="Datei auswählen" type="text" id="TEXT_ID" readonly />
+                    <div class="mdl-button mdl-button--icon mdl-button--file">
+                      <i class="material-icons">attach_file</i>
+                      <input type="file" name="NAME" id="Selected_File" onchange="handleselectedFile()"  />
+                    </div>
+                </div>
+                <div id="progressbar" class="mdl-progress mdl-js-progress"></div>
+                <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" id="getPubs">
+                    Import von Server
+                </button>
+                <div id="textoutput">
+                    <p id="import_output"></p>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+<script>
+
+const textoutput=document.getElementById("import_output");
+
+function init() {
+   
+    const progressbar = document.getElementById('progressbar');
+    progressbar.style.width = '0%';
+
+}
+
+function handleselectedFile () {
+    const progressbar = document.getElementById('progressbar');
+    
+    progressbar.style.width = '0%';
+    //progressbar.text.content = '0%';
+
+    const in_selFile = document.getElementById('Selected_File');
+    let selFileName=in_selFile.files[0].name;
+    console.log('handleselectedFile: ' + selFileName);
+    textoutput.innerHTML= 'handleselectedFile: ' + selFileName + '<br>';
+    document.getElementById('TEXT_ID').value=selFileName;
+
+    // filepath can't be used in browser environment
+    //let filepath = in_selFile.value;
+    //console.log('filepath: ' + filepath);
+
+    const file = in_selFile.files[0];
+    const textType = /text.*/;
+
+    if (file.type.match(textType)) {
+        const reader = new FileReader();
+        reader.onprogress = updateProgress;
+        reader.readAsText(file);    
+
+        reader.onload = function(e) {
+            const text = reader.result;
+            const csvToJson = csvJSON(text);
+            console.log('handleselectedFile: ' + csvToJson.length + " Zeilen gefunden");
+            textoutput.innerHTML += 'handleselectedFile: ' + csvToJson.length + " Zeilen gefunden" + '<br>';
+            fillPubList(csvToJson);
+        }
+    } else {
+        console.log("Dateityp nicht unterstützt");
+    }
+    
+}
+
+function fillPubList(csvinput) {
+
+    let restaurants = new Array();
+    localStorage.clear();
+    
+
+    for (let i = 0; i < csvinput.length; i++) {
+        let address = {
+            "street": csvinput[i].Strasse,
+            "zipcode": csvinput[i].PLZ,
+            "location": csvinput[i].Ort
+        }
+
+        let contact = {
+            "phone": csvinput[i].Telefon,
+            "mail": csvinput[i].Mail,
+            "homepage": csvinput[i].Homepage
+        }
+
+        let opendays = new Array();
+
+        opendays.push(csvinput[i].Montag);
+        opendays.push(csvinput[i].Dienstag);
+        opendays.push(csvinput[i].Mittwoch);
+        opendays.push(csvinput[i].Donnerstag);
+        opendays.push(csvinput[i].Freitag);
+        opendays.push(csvinput[i].Samstag);
+        opendays.push(csvinput[i].Sonntag);
+
+        let openhours = new Array();
+
+        openhours.push(csvinput[i].O_MO);
+        openhours.push(csvinput[i].O_DI);
+        openhours.push(csvinput[i].O_MI);
+        openhours.push(csvinput[i].O_DO);
+        openhours.push(csvinput[i].O_FR);
+        openhours.push(csvinput[i].O_SA);
+        openhours.push(csvinput[i].O_SO);
+        
+        let obj_pub = {
+            "name":      csvinput[i].Name,
+            "type":      csvinput[i].Typ,
+            "address":   JSON.stringify(address),
+            "contact":   JSON.stringify(contact),
+            "opendays":  JSON.stringify(opendays),
+            "openhours": JSON.stringify(openhours),
+            "comment":   csvinput[i].Kommentar
+        }
+        //window.globalData.push(obj_pub);
+        restaurants.push(obj_pub);
+        textoutput.innerHTML += 'handleselectedFile: ' + '[' + obj_pub.name + '] ' + '[' + csvinput[i].PLZ + " " + csvinput[i].Ort + '] added' + '<br>';
+    }
+    // Convert the array to a JSON string
+    let string = JSON.stringify(restaurants);
+
+    // Store the JSON string in local storage
+    localStorage.setItem("restaurants", string);
+}
+
+function csvJSON(csv) {
+    const lines = csv.split('\n')
+    const result = []
+    const headers = lines[0].split(';')
+
+    for (let i = 1; i < lines.length; i++) {        
+        if (!lines[i])
+            continue
+        const obj = {}
+        const currentline = lines[i].split(';')
+
+        for (let j = 0; j < headers.length; j++) {
+            obj[headers[j]] = currentline[j]
+        }
+        result.push(obj)
+    }
+    return result
+}
+
+function updateProgress(event) {
+    const progressbar = document.getElementById('progressbar');
+    if (event.lengthComputable) {
+        const percentLoaded = Math.round((event.loaded / event.total) *100);
+        if (percentLoaded < 100) {
+            progressbar.style.width = percentLoaded + '%';
+            //progressbar.text.content = percentLoaded + '%';
+
+        }
+        if (percentLoaded == 100) {
+            progressbar.style.width = 250 +'px';
+            //progressbar.text.content = percentLoaded + '%';
+
+        }
+    }
+}
+
+// different events are used in chrome desktop browser and on apple mobile devices
+    // Chrome:          onclick
+    // Apple mobile:    ontouchstart
+    if (navigator.userAgent.indexOf("Chrome") > -1) {
+        console.log("Chrome");
+        document.getElementById('getPubs').onclick = btn_getpubs_clicked;
+    }else {
+        // Safari on iphone and ipad uses ontouchstart
+        console.log("No Chrome");
+        document.getElementById('findpub').ontouchstart = btn_getpubs_clicked;
+    }
+
+    // this function is called when the button with the id findpub is clicked
+    function btn_getpubs_clicked(){
+
+        const url = location.protocol + "//" + location.hostname + ":" + location.port + "/convert";
+
+        console.log('URL : ' + url);
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+            console.log('json from server:');
+            console.log(data);
+            textoutput.innerHTML += 'handleselectedFile: ' + data.length + " Zeilen gefunden" + '<br>';
+            fillPubList(data);
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+    });
+        
+    }
+
+</script>
+</html>

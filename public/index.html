@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pub Finder</title>
+    <script type="text/javascript" src="pubs_list.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="img/beer-icon3.png">
+</head>
+
+
+<body onload="setDefault()">
+    <!-- Always shows a header, even in smaller screens. -->
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+        <div class="mdl-layout__header-row">
+            <!-- Title -->
+            <span class="mdl-layout-title">Pub Finder Home</span>
+            <!-- Add spacer, to align navigation to the right -->
+            <div class="mdl-layout-spacer"></div>
+            <!-- Navigation. We hide it in small screens. -->
+            <nav class="mdl-navigation mdl-layout--large-screen-only">
+            <a class="mdl-navigation__link" href="index.html">Home</a>
+            <a class="mdl-navigation__link" href="pub_maps.html">Map</a>
+            <a class="mdl-navigation__link" href="pub_import.html">Import</a>
+            <a class="mdl-navigation__link" href="pub_settings.html">Settings</a>
+            <a class="mdl-navigation__link" href="pub_help.html">Help</a>
+            </nav>
+        </div>
+        </header>
+        <div class="mdl-layout__drawer">
+        <span class="mdl-layout-title">Pub Finder</span>
+        <nav class="mdl-navigation">
+            <a class="mdl-navigation__link" href="index.html">Home</a>
+            <a class="mdl-navigation__link" href="pub_maps.html">Map</a>
+            <a class="mdl-navigation__link" href="pub_import.html">Import</a>
+            <a class="mdl-navigation__link" href="pub_settings.html">Settings</a>
+            <a class="mdl-navigation__link" href="pub_help.html">Help</a>
+        </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <div class="page-content" id="page_home"><!-- Your content goes here -->
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                        <select class="mdl-textfield__input" id="day_selector" name="Tagesliste">
+                            <option value="So">Sonntag</option>
+                            <option value="Mo">Montag</option>
+                            <option value="Di">Dienstag</option>
+                            <option value="Mi">Mittwoch</option>
+                            <option value="Do">Donnerstag</option>
+                            <option value="Fr">Freitag</option>
+                            <option value="Sa">Samstag</option>
+                        </select>
+                </div>        
+                <div>
+                    <button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent" id="findpub">
+                        Suche Gasthaus
+                    </button>
+                </div>
+                <div class="mdl-textfield mdl-js-textfield" id="Div_NameFilter">
+                    <input class="mdl-textfield__input" type="text" id="Input_NameFilter" onkeyup="filterPubs(1)">
+                    <label class="mdl-textfield__label" for="Input_NameFilter">Name...</label>
+                </div>
+                <div class="mdl-textfield mdl-js-textfield" id="Div_LocationFilter">
+                    <input class="mdl-textfield__input" type="text" id="Input_LocationFilter" onkeyup="filterPubs(2)">
+                    <label class="mdl-textfield__label" for="Input_LocationFilter">Ort...</label>
+                </div>
+                
+                <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp" id = "pub_table">
+                    <thead>
+                    <tr>
+                        <th class="mdl-data-table__cell--non-numeric">Nr</th>
+                        <th class="mdl-data-table__cell--non-numeric">Typ</th>
+                        <th class="mdl-data-table__cell--non-numeric">Name</th>
+                        <th class="mdl-data-table__cell--non-numeric">Offen</th>
+                        <th class="mdl-data-table__cell--non-numeric">Telefon</th>
+                        <th class="mdl-data-table__cell--non-numeric">Ort</th>
+                        <th class="mdl-data-table__cell--non-numeric">Strasse</th>
+                        <th class="mdl-data-table__cell--non-numeric">Homepage</th>
+                        <th class="mdl-data-table__cell--non-numeric">E-Mail</th>
+                    </tr>
+                    </thead>
+                    <tbody id = "pub_table_body"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+
+<script>
+    // global variables
+    const sb_days = document.getElementById('day_selector');
+    const tbl_foundpubs = document.getElementById('pub_table');
+    let tbl_body;
+    
+    
+    // different events are used in chrome desktop browser and on apple mobile devices
+    // Chrome:          onclick
+    // Apple mobile:    ontouchstart
+    if (navigator.userAgent.indexOf("Chrome") > -1) {
+        console.log("Chrome");
+        document.getElementById('findpub').onclick = btn_findpub_clicked;
+    }else {
+        // Safari on iphone and ipad uses ontouchstart
+        console.log("No Chrome");
+        document.getElementById('findpub').ontouchstart = btn_findpub_clicked;
+    }
+
+    // this function is called when the button with the id findpub is clicked
+    function btn_findpub_clicked(){
+        console.log("Selected Day: " + sb_days.value);
+        let retString = null;
+        pubs=[];
+
+        // Retrieve the JSON string from local storage
+        retString = localStorage.getItem("restaurants");
+
+        if (retString != null) {
+
+            // Convert the JSON string back to an array
+            let retArray = JSON.parse(retString);
+        
+            for(let i = 0; i < retArray.length; i++){
+                let objcsvpub = {
+                            "name":      retArray[i].name,
+                            "type":      retArray[i].type,
+                            "address":   JSON.parse(retArray[i].address),
+                            "contact":   JSON.parse(retArray[i].contact),
+                            "opendays":  JSON.parse(retArray[i].opendays),
+                            "openhours": JSON.parse(retArray[i].openhours),
+                            "comment":   retArray[i].comment
+                            
+                        }
+                pubs.push(objcsvpub);
+            }
+            findopenpubs(sb_days.value);
+        } else {
+            alert("Pub Konfiurations-Daten müssen erst importiert werden");
+        }
+         
+    }
+    
+    // set the default day in the day selection list
+    function setDefault() {
+        document.body.style.overflow = "auto";
+        const currentDate = new Date();
+        const today = currentDate.getDay(); // Returns a number from 0 (Sunday) to 6 (Saturday)
+        //console.log(today);
+        sb_days[today].selected=true;
+    }
+
+    // central function to find open pubs and fill the found pubs array with the pub objects
+    // after the array has been filled, the data is transferred to the table (createTableData)
+    function findopenpubs(sday) {
+    
+        const arr_foundpubs = new Array();
+        
+        // clear table and filters
+        for(let i = 1; i < tbl_foundpubs.rows.length;i){
+            tbl_foundpubs.deleteRow(i);
+        }
+        
+        document.getElementById("Input_NameFilter").value='';
+        document.getElementById("Input_LocationFilter").value='';
+
+        // loop through the pub json list to find a pub for the selected short day
+        for (let i = 0; i < pubs.length; i++) {
+            for (let j = 0; j < pubs[i].opendays.length; j++) {
+                if (sday == pubs[i].opendays[j]) {
+                    
+                    let obj_pub = {
+                        "name":     pubs[i].name,
+                        "type":     pubs[i].type,
+                        "address":  pubs[i].address.zipcode + " " + pubs[i].address.location,
+                        "street":   pubs[i].address.street,
+                        "open":     pubs[i].openhours[j],
+                        "phone":    pubs[i].contact.phone,
+                        "homepage": pubs[i].contact.homepage,
+                        "mail":     pubs[i].contact.mail
+                    }
+                    arr_foundpubs.push(obj_pub);
+                } 
+            }   
+        }
+
+        if (arr_foundpubs.length == 0) {
+            alert("Kein Restaurant gefunden")
+        } else { 
+            createTableData(arr_foundpubs);
+        }
+    }
+
+    // create the html string for each row 
+    function createTableData (pub_array) {
+        let tbl_body = document.getElementById('pub_table_body');
+            
+        for (let i = 0; i < pub_array.length; i++) {
+            let hyp="";
+            let pub_imagelink="";
+            let email="";
+            let phone="";
+            // dtermine index number
+            let nr = padWithLeadingZeros(i+1, 2);
+            // get th ename of the image related to the pub type
+            let pub_type_image = "img/" + getImageName(pub_array[i].type);
+
+            // cretae URL string for the pub homepage
+            if (pub_array[i].homepage) {
+                hyp="<a href=" + pub_array[i].homepage + " " + "target=" + '"_blank"'  + ">" + pub_array[i].homepage  + "</a>";
+                pub_imagelink = "<a href=" + pub_array[i].homepage + " " + "target=" + '"_blank"'  + ">" + "<img src = " + pub_type_image + ">" + "</a>";
+            }
+            // create the mail URL string
+            if (pub_array[i].mail) {
+                email="<a href=" + "mailto:" + pub_array[i].mail + ">" + pub_array[i].mail + "</a>";
+            }
+            // creta the phone URL string
+            if (pub_array[i].phone) {
+                phone="<a href=" + "tel://" + pub_array[i].phone + ">" + pub_array[i].phone + "</a>";
+            }
+            
+            console.log(nr, " ",pub_array[i].type, pub_array[i].name, " ", pub_array[i].address, " ", pub_array[i].street, " ", pub_array[i].open);
+            console.log(hyp);
+            console.log(email);
+            console.log(phone);
+            let row = "<tr>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + nr + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + pub_imagelink + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + pub_array[i].name + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + pub_array[i].open + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + phone + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + pub_array[i].address + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + pub_array[i].street + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + hyp + "</td>" +
+                                "<td " + "class=" + "mdl-data-table__cell--non-numeric" +">" + email + "</td>" +
+                        "</tr>";
+
+            // add the row to the table
+            tbl_body.innerHTML += row;                          
+        }
+    }
+
+    // help function to generate leading zeroes
+    function padWithLeadingZeros(num, totalLength) {
+        return String(num).padStart(totalLength, '0');
+    }
+        
+    // function to get the image name to the corresponding pub type
+    function getImageName(type) {
+        let imagename = '';
+
+        switch(type) {
+            case 'fränkisch':
+            imagename = 'frankonia-flag.png';
+            break;
+            case 'italienisch':
+                imagename = 'italy-flag.png';
+            break;
+            case 'türkisch':
+                imagename = 'turkish-flag.png';
+            break;
+            case 'griechisch':
+                imagename = 'greece-flag.png';
+            break;
+            case 'Cafe':
+                imagename = 'coffee-flag.png';
+            break;
+            case 'serbisch':
+                imagename = 'serbia-flag.png';
+            break;
+            case 'thailändisch':
+                imagename = 'thailand-flag.png';
+            break;
+            case 'chinesisch':
+                imagename = 'china-flag.png';
+            break;
+            case 'japanisch':
+                imagename = 'japan-flag.png';
+            break;
+            case 'ungarisch':
+                imagename = 'hungary-flag.png';
+            break;
+            case 'amerikanisch':
+                imagename = 'usa-flag.png';
+            break;
+            case 'windbeutel':
+                imagename = 'windbeutel.png';
+            break;
+            case 'Steak':
+                imagename = 'tomahawk-steak.png';
+            break;
+            case 'armenisch':
+                imagename = 'armenia-flag.png';
+            break;
+            default:
+                imagename = '';
+        }
+        console.log('type:' + type );
+        console.log('image:' + "<" + imagename + ">");
+        return String(imagename);
+    }
+    
+
+    // filter for pub name or location
+    function filterPubs(filterno) {
+        // Declare variables
+        let input, filter, table, tr, td, i, txtValue, col;
+
+        switch(filterno) {
+            case 1:
+            input = document.getElementById("Input_NameFilter");
+            col=2;
+            break;
+            case 2:
+            input = document.getElementById("Input_LocationFilter");
+            col=5;
+            break;
+            
+            default:
+            // code block
+        }
+
+        
+        filter = input.value.toUpperCase();
+        tr = tbl_foundpubs.getElementsByTagName("tr");
+
+        // Loop through all table rows, and hide those who don't match the search query
+        for (i = 0; i < tr.length; i++) {
+            td = tr[i].getElementsByTagName("td")[col];
+            if (td) {
+                txtValue = td.textContent || td.innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+            }
+        }
+  }
+</script>
+</html>
